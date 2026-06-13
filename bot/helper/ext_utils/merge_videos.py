@@ -14,6 +14,21 @@ from bot.helper.mirror_leech_utils.status_utils.merge_status import MergeStatus
 from bot.helper.telegram_helper.message_utils import update_status_message
 
 
+def _clean_merge_name(name):
+    if not name:
+        return ""
+    name = ospath.basename(ospath.normpath(str(name).strip()))
+    name = ospath.splitext(name)[0].strip()
+    return "" if not name or name.startswith(".") else name
+
+
+def _get_merge_name(path, listener_name=None, original_dir=None, custom_name=None):
+    for candidate in (custom_name, listener_name, path, original_dir):
+        if merge_name := _clean_merge_name(candidate):
+            return merge_name
+    return "merged"
+
+
 class Merge:
     def __init__(self, listener):
         self._listener = listener
@@ -56,20 +71,18 @@ class Merge:
         LOGGER.info(f'Merge check for: {path} | Found {len(list_files)} video file(s)')
         
         if len(list_files) > 1:
-            # Use custom name if provided, otherwise use directory name.
-            # Normalize paths so a trailing slash does not produce an empty
-            # basename and create a merged file named only `.mkv`.
+            # Prefer an explicit merge name, then the original task/torrent name.
+            # Web-series torrents can unpack into generic site folders (for example
+            # a domain name), so naming the merged output from the download root can
+            # produce useless names like `.mkv` or `www.example.mkv`.
+            name_without_ext = _get_merge_name(
+                path,
+                listener_name=getattr(self._listener, "name", None),
+                original_dir=original_dir,
+                custom_name=custom_name,
+            )
             if custom_name and custom_name.strip():
-                name_without_ext = ospath.splitext(custom_name.strip())[0]
                 LOGGER.info(f'Using custom merge name: {name_without_ext}')
-            else:
-                name = ospath.basename(ospath.normpath(path))
-                if not name and original_dir:
-                    name = ospath.basename(ospath.normpath(original_dir))
-                name_without_ext = ospath.splitext(name)[0]
-
-            if not name_without_ext:
-                name_without_ext = "merged"
             async with task_dict_lock:
                 task_dict[self._listener.mid] = MergeStatus(name_without_ext, size, gid, self, self._listener)
             await update_status_message(self._listener.message.chat.id)
