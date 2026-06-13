@@ -56,13 +56,20 @@ class Merge:
         LOGGER.info(f'Merge check for: {path} | Found {len(list_files)} video file(s)')
         
         if len(list_files) > 1:
-            # Use custom name if provided, otherwise use directory name
-            if custom_name:
-                name_without_ext = ospath.splitext(custom_name)[0]
+            # Use custom name if provided, otherwise use directory name.
+            # Normalize paths so a trailing slash does not produce an empty
+            # basename and create a merged file named only `.mkv`.
+            if custom_name and custom_name.strip():
+                name_without_ext = ospath.splitext(custom_name.strip())[0]
                 LOGGER.info(f'Using custom merge name: {name_without_ext}')
             else:
-                name = ospath.basename(path)
+                name = ospath.basename(ospath.normpath(path))
+                if not name and original_dir:
+                    name = ospath.basename(ospath.normpath(original_dir))
                 name_without_ext = ospath.splitext(name)[0]
+
+            if not name_without_ext:
+                name_without_ext = "merged"
             async with task_dict_lock:
                 task_dict[self._listener.mid] = MergeStatus(name_without_ext, size, gid, self, self._listener)
             await update_status_message(self._listener.message.chat.id)
