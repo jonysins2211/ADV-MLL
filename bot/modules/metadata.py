@@ -1,4 +1,4 @@
-from asyncio import create_subprocess_exec
+from asyncio import create_subprocess_exec, create_task, sleep
 from asyncio.subprocess import PIPE
 import os
 from os import path as ospath, walk
@@ -167,10 +167,8 @@ async def apply_metadata_title(
             media_info = await get_media_info(file_path)
             if media_info:
                 ffmpeg._total_time = media_info[0]
-            
+
             # Start monitoring output file size for progress
-            from asyncio import create_task
-            
             async def monitor_output():
                 while self.subproc and self.subproc.returncode is None:
                     await sleep(0.5)
